@@ -67,8 +67,10 @@ class ServerThreading(threading.Thread):
                 if msg.strip().endswith('paramover'):
                     print("调用接收参数方法")
                     msg=msg[:-9]
-                    list = msg.split();
-                    print(list[1])
+                    msgList = msg.split('|');
+                    print(msgList)
+                    specialparams = msgList[0].split()
+                    list = msgList[1].split();
                     if not os.path.exists(list[1]):
                         os.rename('fileFromClient.csv', list[1])
 
@@ -79,15 +81,13 @@ class ServerThreading(threading.Thread):
                     elif list[0] == 'avg_forecast':
                         forecast.avg_forecast(paramsList)
                     elif list[0] == 'moving_avg_forecast':
-                        forecast.moving_avg_forecast(paramsList)
+                        forecast.moving_avg_forecast(paramsList, specialparams)
                     elif list[0] == 'SES':
-                        forecast.SES(paramsList)
+                        forecast.SES(paramsList, specialparams)
                     elif list[0] == 'Holt':
-                        forecast.Holt(paramsList)
-                    elif list[0] == 'Holt_Winters':
-                        forecast.Holt_Winters(paramsList)
+                        forecast.Holt(paramsList, specialparams)
                     elif list[0] == 'ARIMA':
-                        forecast.ARIMA(paramsList)
+                        forecast.ARIMA(paramsList, specialparams)
 
 
                     fo = open("result.csv",'rb')

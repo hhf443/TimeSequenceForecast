@@ -103,13 +103,14 @@ def avg_forecast(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
 
 
 # 3：移动平均法
-def moving_avg_forecast(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
+def moving_avg_forecast(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'], specialParams=['60']):
 
     path = paramsList[0]
     trainRows = float(paramsList[1])
     saveto = 'result.csv'
     df = pd.read_csv(path, usecols=paramsList[2:])
     allRows = df.shape[0]
+    windows = specialParams[0]
 
     train = df[0:int(allRows*trainRows)]
     test = df[int(allRows*trainRows)+1:]
@@ -130,7 +131,7 @@ def moving_avg_forecast(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'd
     # 以上可通用----------------------------
 
     for i in range(2,len(paramsList)-1):
-        y_hat[paramsList[i]] = train[paramsList[i]].rolling(60).mean().iloc[-1]
+        y_hat[paramsList[i]] = train[paramsList[i]].rolling(int(windows)).mean().iloc[-1]
         # newList.append(paramsList[i])
 
     # --------------------------------------
@@ -144,13 +145,23 @@ def moving_avg_forecast(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'd
     print(rms)
     '''
  # 4：简单指数平滑法
-def SES(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
+def SES(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'],specialParams=['0.6']):
 
+    '''
+    1.时间序列比较平稳时，选择较小的α值，0.05-0.20。
+
+            2.时间序列有波动，但长期趋势没大的变化，可选稍大的α值，0.10-0.40。
+
+            3.时间序列波动很大，长期趋势变化大有明显的上升或下降趋势时，宜选较大的α值，0.60-0.80。
+
+            4.当时间序列是上升或下降序列，满足加性模型，α取较大值，0.60-1。
+    '''
     path = paramsList[0]
     trainRows = float(paramsList[1])
     saveto = 'result.csv'
     df = pd.read_csv(path, usecols=paramsList[2:])
     allRows = df.shape[0]
+    es = specialParams[0]
 
     train = df[0:int(allRows*trainRows)]
     test = df[int(allRows*trainRows)+1:]
@@ -171,7 +182,7 @@ def SES(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
     # 以上可通用----------------------------
 
     for i in range(2,len(paramsList)-1):
-        fit = SimpleExpSmoothing(np.asarray(train[paramsList[i]])).fit(smoothing_level=0.6, optimized=False)
+        fit = SimpleExpSmoothing(np.asarray(train[paramsList[i]])).fit(smoothing_level=float(es), optimized=False)
         y_hat[paramsList[i]] = fit.forecast(len(test))
 
         rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
@@ -183,13 +194,15 @@ def SES(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
     s.to_csv(saveto,index=False,header=True)
 
 # 5：霍尔特(Holt)线性趋势法
-def Holt(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
+def Holt(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'], specialParams=['0.3','0.1']):
 
     path = paramsList[0]
     trainRows = float(paramsList[1])
     saveto = 'result.csv'
     df = pd.read_csv(path, usecols=paramsList[2:])
     allRows = df.shape[0]
+    smoothing_level = specialParams[0]
+    smoothing_slope = specialParams[1]
 
     train = df[0:int(allRows*trainRows)]
     test = df[int(allRows*trainRows)+1:]
@@ -210,7 +223,7 @@ def Holt(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
     # 以上可通用----------------------------
 
     for i in range(2,len(paramsList)-1):
-        fit = Holt(np.asarray(train[paramsList[i]])).fit(smoothing_level=0.3, smoothing_slope=0.1)
+        fit = Holt(np.asarray(train[paramsList[i]])).fit(float(smoothing_level), float(smoothing_slope))
         y_hat[paramsList[i]] = fit.forecast(len(test))
 
         rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
@@ -222,13 +235,14 @@ def Holt(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
     s.to_csv(saveto,index=False,header=True)
 
 # 6：Holt-Winters季节性预测模型
-def Holt_Winters(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
+def Holt_Winters(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'], specialParams=['7']):
 
     path = paramsList[0]
     trainRows = float(paramsList[1])
     saveto = 'result.csv'
     df = pd.read_csv(path, usecols=paramsList[2:])
     allRows = df.shape[0]
+    season = specialParams[0]
 
     train = df[0:int(allRows*trainRows)]
     test = df[int(allRows*trainRows)+1:]
@@ -250,8 +264,26 @@ def Holt_Winters(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
 
 
     for i in range(2,len(paramsList)-1):
-        print(1)
-    fit1 = ExponentialSmoothing(np.asarray(train['Count']), seasonal_periods=7, trend='add', seasonal='add', ).fit()
+        print("进入循环")
+        fit1 = ExponentialSmoothing(np.asarray(train[paramsList[i]]), seasonal_periods=int(season), trend='add', seasonal='add').fit()
+        y_hat[paramsList[i]] = fit1.predict(start="2014/7/3", end="2014/9/21")
+        print("结束fit1")
+        rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
+        print(rms)
+
+        y_hat['Holt_Winter'] = fit1.forecast(len(test))
+        plt.figure(figsize=(16, 8))
+        plt.plot(train[paramsList[i]], label='Train')
+        plt.plot(test[paramsList[i]], label='Test')
+        plt.plot(y_hat[paramsList[i]], label='Holt_Winter')
+        plt.legend(loc='best')
+        plt.show()
+
+    y_hat['time'] = test.index
+    yhat_avg = np.array(y_hat)
+    s = pd.DataFrame(yhat_avg, columns=paramsList[2:])
+    s.to_csv(saveto,index=False,header=True)
+    '''
     y_hat['Holt_Winter'] = fit1.forecast(len(test))
     plt.figure(figsize=(16, 8))
     plt.plot(train['Count'], label='Train')
@@ -259,23 +291,24 @@ def Holt_Winters(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
     plt.plot(y_hat['Holt_Winter'], label='Holt_Winter')
     plt.legend(loc='best')
     plt.show()
+    '''
 
-    rms = sqrt(mean_squared_error(test['Count'], y_hat['Holt_Winter']))
-    print(rms)
 
 # 7：自回归移动平均模型（ARIMA）
-def ARIMA(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
+def ARIMA(paramsList=['train.csv', '0.93','Count','Datetime'], specialParams=['2','1','4','0','1', '1', '7']):
 
     path = paramsList[0]
     trainRows = float(paramsList[1])
     saveto = 'result.csv'
     df = pd.read_csv(path, usecols=paramsList[2:])
     allRows = df.shape[0]
+    order = tuple(map(int, specialParams[0:3].copy()))
+    seasonal_order = tuple(map(int, specialParams[3:].copy()))
 
     train = df[0:int(allRows*trainRows)]
     test = df[int(allRows*trainRows)+1:]
 
-    print(test["Timestamp"])
+
     df['Timestamp'] = pd.to_datetime(df[paramsList[-1]], format='%Y/%m/%d %H:%M')
     df.index = df['Timestamp']
     df = df.resample('D').mean()
@@ -292,11 +325,11 @@ def ARIMA(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date']):
     # 以上可通用----------------------------
 
     for i in range(2,len(paramsList)-1):
-        fit1 = sm.tsa.statespace.SARIMAX(train[paramsList[i]], order=(2, 1, 4), seasonal_order=(0, 1, 1, 7)).fit()
+        fit1 = sm.tsa.statespace.SARIMAX(train[paramsList[i]], order=order, seasonal_order=seasonal_order).fit()
         # newList.append(paramsList[i])
         #y_hat_avg[paramsList[i]] = fit1.predict(start="2014/7/3", end="2014/12/31", dynamic=True)
 
-        y_hat[paramsList[i]] = fit1.predict(start="2014/7/3", end="2014/12/31", dynamic=True)
+        y_hat[paramsList[i]] = fit1.predict(start=test.index[0], end=test.index[-1], dynamic=True)
         rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
         print(rms)
     # --------------------------------------
