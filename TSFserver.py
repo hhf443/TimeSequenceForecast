@@ -6,7 +6,6 @@ import numpy as np
 from PIL import Image
 
 import forecast
-from naive import naive
 
 
 def main():
@@ -85,7 +84,7 @@ class ServerThreading(threading.Thread):
                     elif list[0] == 'SES':
                         forecast.SES(paramsList, specialparams)
                     elif list[0] == 'Holt':
-                        forecast.Holt(paramsList, specialparams)
+                        forecast.Holtmethod(paramsList, specialparams)
                     elif list[0] == 'ARIMA':
                         forecast.ARIMA(paramsList, specialparams)
 
@@ -104,8 +103,11 @@ class ServerThreading(threading.Thread):
                     print("调用接收文件方法")
                     msg = msg[:-8]
                     list = msg.split('|');
-                    fi = open('fileFromClient.csv', 'w')   #将str写入文件
-                    for items in list:
+                    listdata = list[0:-1]
+                    filename = list[-1]
+
+                    fi = open(filename, 'w')   #将str写入文件
+                    for items in listdata:
                         fi.write(items)     #读取List的每一行字符串，以,分割表项存入csv
                         fi.write("\n")      #另起一行
                     print("从客户端传来的文件存入完毕")
