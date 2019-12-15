@@ -4,7 +4,7 @@ import sys
 import threading
 import numpy as np
 from PIL import Image
-
+import dataClean
 import forecast
 
 
@@ -103,7 +103,7 @@ class ServerThreading(threading.Thread):
                     print("调用接收文件方法")
                     msg = msg[:-8]
                     list = msg.split('|');
-                    listdata = list[0:-1]
+                    listdata = list[0:-2]
                     filename = list[-1]
 
                     fi = open(filename, 'w')   #将str写入文件
@@ -111,6 +111,20 @@ class ServerThreading(threading.Thread):
                         fi.write(items)     #读取List的每一行字符串，以,分割表项存入csv
                         fi.write("\n")      #另起一行
                     print("从客户端传来的文件存入完毕")
+
+                    date_filename = list[-2:]
+                    print(date_filename[::-1])
+                    # 传回处理后的数据给客户端
+                    dataClean.dataclean(date_filename[::-1])
+                    fo = open(filename,'rb')
+                    while True:
+                        filedata = fo.read(1024)
+                        if not filedata:
+                            break
+                        #s.send(filedata)
+                        self._socket.send(filedata)
+                    fo.close()
+                    print("传回处理后的数据完毕")
                     break
 
             #sendmsg = Image.open(msg)
