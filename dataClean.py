@@ -9,7 +9,7 @@ def dataclean(params=['pollution.csv','date']):
     df = df.resample('D').mean()
 
 
-    for i in range(1,len(list)-1):
+    for i in range(1,len(list)):
         df[list[i]] = round(df[list[i]], 2)
     df['time'] = df.index
     array = np.array(df)

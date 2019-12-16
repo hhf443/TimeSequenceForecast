@@ -411,5 +411,5 @@ if __name__ == '__main__':
         #ARIMA(path='train.csv', allRows=18280, trainRows=0.90, paramsList=list)
         #ARIMA(path='pollution.csv', trainRows=0.90, paramsList=list)
     '''
-    Holtmethod()
+    naive()
 

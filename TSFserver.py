@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 import dataClean
 import forecast
-
+import csv
 
 def main():
     # 创建服务器套接字
@@ -106,10 +106,14 @@ class ServerThreading(threading.Thread):
                     listdata = list[0:-2]
                     filename = list[-1]
 
-                    fi = open(filename, 'w')   #将str写入文件
-                    for items in listdata:
-                        fi.write(items)     #读取List的每一行字符串，以,分割表项存入csv
-                        fi.write("\n")      #另起一行
+                    with open(filename, 'w', newline='\n') as fp:  #将str写入文件
+                    #for items in listdata:
+                        writer = csv.writer(fp)
+                        for row in listdata:
+                            row = row.split(',')
+                            writer.writerow(row)
+                        #fi.write(items)     #读取List的每一行字符串，以,分割表项存入csv
+                        #fi.write("\n")      #另起一行
                     print("从客户端传来的文件存入完毕")
 
                     date_filename = list[-2:]
@@ -118,11 +122,11 @@ class ServerThreading(threading.Thread):
                     dataClean.dataclean(date_filename[::-1])
                     fo = open(filename,'rb')
                     while True:
-                        filedata = fo.read(1024)
-                        if not filedata:
+                        senddata = fo.read(1024)
+                        if not senddata:
                             break
                         #s.send(filedata)
-                        self._socket.send(filedata)
+                        self._socket.send(senddata)
                     fo.close()
                     print("传回处理后的数据完毕")
                     break
