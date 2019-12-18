@@ -6,7 +6,15 @@ from statsmodels.tsa.api import ExponentialSmoothing
 import statsmodels.api as sm
 from sklearn.metrics import mean_squared_error
 from math import sqrt
+from statsmodels.tsa.vector_ar.var_model import VAR
 import re
+from statsmodels.tsa.vector_ar.vecm import coint_johansen
+
+from statsmodels.tsa.ar_model import AR
+from statsmodels.tsa.arima_model import ARMA
+from pandas import Series
+from matplotlib import pyplot
+from pandas.tools.plotting import lag_plot
 
 #def naive(path, date='date', col_pm='pm', col_humidity='humidity', col_temperature='temperature',
 #          col_pressure='pressure', col_windspeed='windspeed', col_snowfall='snowfall', col_rainfall='rainfall'):
@@ -276,6 +284,220 @@ def Holtmethod(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'], sp
         s[paramsList[i]][0:int(len(s)*trainRows)] = ""
     s.to_csv(saveto,index=False,header=True,float_format='%.2f')
 
+
+#自回归模型
+def ARmethod(paramsList=['pollution.csv', '0.93','pm','date'], specialParams=['2','1','4','0','1', '1', '7']):
+
+
+    path = paramsList[0]
+    trainRows = float(paramsList[1])
+    saveto = 'result.csv'
+    df = pd.read_csv(path, usecols=paramsList[2:])
+    allRows = df.shape[0]
+
+
+    train = df[0:int(allRows*trainRows)]
+    test = df[int(allRows*trainRows)+1:]
+
+
+    df['Timestamp'] = pd.to_datetime(df[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    df.index = df['Timestamp']
+    df = df.resample('D').mean()
+
+    train['Timestamp'] = pd.to_datetime(train[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    train.index = train['Timestamp']
+    train = train.resample('D').mean()
+
+    test['Timestamp'] = pd.to_datetime(test[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    test.index = test['Timestamp']
+    test = test.resample('D').mean()
+
+    y_hat = test.copy()
+    nullArray = train.copy()
+    nullArray['time'] = train.index
+    # 以上可通用----------------------------
+
+    for i in range(2,len(paramsList)-1):
+        model = AR(train[paramsList[i]])
+        model_fit = model.fit()
+        predictions = model_fit.predict(start=len(train), end=len(train)+len(test), dynamic=False)
+
+        print(predictions)
+        y_hat[paramsList[i]] = predictions
+
+        rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
+        print(rms)
+    # --------------------------------------
+    y_hat['time'] = test.index
+    yhat_naive = np.array(y_hat)
+    nArray = np.array(nullArray)
+    newArray = np.concatenate((nArray,yhat_naive),axis=0)
+    s = pd.DataFrame(newArray, columns=paramsList[2:])
+    for i in range(2,len(paramsList)-1):
+        s[paramsList[i]][0:int(len(s)*trainRows)] = ""
+    s.to_csv(saveto,index=False,header=True,float_format='%.2f')
+
+
+# 7：自回归移动平均模型（ARIMA）
+def ARIMA(paramsList=['pollution.csv', '0.93','pm','date'], specialParams=['2','1','4','0','1', '1', '7']):
+
+    path = paramsList[0]
+    trainRows = float(paramsList[1])
+    saveto = 'result.csv'
+    df = pd.read_csv(path, usecols=paramsList[2:])
+    allRows = df.shape[0]
+    order = tuple(map(int, specialParams[0:3].copy()))
+    seasonal_order = tuple(map(int, specialParams[3:].copy()))
+
+    train = df[0:int(allRows*trainRows)]
+    test = df[int(allRows*trainRows)+1:]
+
+
+    df['Timestamp'] = pd.to_datetime(df[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    df.index = df['Timestamp']
+    df = df.resample('D').mean()
+
+    train['Timestamp'] = pd.to_datetime(train[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    train.index = train['Timestamp']
+    train = train.resample('D').mean()
+
+    test['Timestamp'] = pd.to_datetime(test[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    test.index = test['Timestamp']
+    test = test.resample('D').mean()
+
+    y_hat = test.copy()
+    nullArray = train.copy()
+    nullArray['time'] = train.index
+    # 以上可通用----------------------------
+
+    for i in range(2,len(paramsList)-1):
+        fit1 = sm.tsa.statespace.SARIMAX(train[paramsList[i]], order=order, seasonal_order=seasonal_order).fit()
+        y_hat[paramsList[i]] = fit1.predict(start=test.index[0], end=test.index[-1], dynamic=True)
+        y_hat[paramsList[i]] = round(y_hat[paramsList[i]],2)
+        rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
+        print(rms)
+    # --------------------------------------
+    y_hat['time'] = test.index
+    yhat_naive = np.array(y_hat)
+    nArray = np.array(nullArray)
+    newArray = np.concatenate((nArray,yhat_naive),axis=0)
+    s = pd.DataFrame(newArray, columns=paramsList[2:])
+    for i in range(2,len(paramsList)-1):
+        s[paramsList[i]][0:int(len(s)*trainRows)] = ""
+    s.to_csv(saveto,index=False,header=True,float_format='%.2f')
+
+
+#自回归移动
+def ARMAmethod(paramsList=['pollution.csv', '0.93','pm','date'], specialParams=['3','1']):
+
+
+    path = paramsList[0]
+    trainRows = float(paramsList[1])
+    saveto = 'result.csv'
+    df = pd.read_csv(path, usecols=paramsList[2:])
+    allRows = df.shape[0]
+    order = tuple(map(int, specialParams[0:2].copy()))
+
+
+    train = df[0:int(allRows*trainRows)]
+    test = df[int(allRows*trainRows)+1:]
+
+
+    df['Timestamp'] = pd.to_datetime(df[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    df.index = df['Timestamp']
+    df = df.resample('D').mean()
+
+    train['Timestamp'] = pd.to_datetime(train[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    train.index = train['Timestamp']
+    train = train.resample('D').mean()
+
+    test['Timestamp'] = pd.to_datetime(test[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    test.index = test['Timestamp']
+    test = test.resample('D').mean()
+
+    y_hat = test.copy()
+    nullArray = train.copy()
+    nullArray['time'] = train.index
+    # 以上可通用----------------------------
+
+    for i in range(2,len(paramsList)-1):
+        model = ARMA(train[paramsList[i]],order=order)
+        model_fit = model.fit()
+        predictions = model_fit.predict(start=len(train), end=len(train)+len(test), dynamic=False)
+
+        print(predictions)
+        y_hat[paramsList[i]] = predictions
+
+        rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
+        print(rms)
+    # --------------------------------------
+    y_hat['time'] = test.index
+    yhat_naive = np.array(y_hat)
+    nArray = np.array(nullArray)
+    newArray = np.concatenate((nArray,yhat_naive),axis=0)
+    s = pd.DataFrame(newArray, columns=paramsList[2:])
+    for i in range(2,len(paramsList)-1):
+        s[paramsList[i]][0:int(len(s)*trainRows)] = ""
+    s.to_csv(saveto,index=False,header=True,float_format='%.2f')
+
+#向量自回归
+def VARmethod(paramsList=['pollution.csv', '0.93','pm','date'], specialParams=['2','1','4','0','1', '1', '7']):
+    path = paramsList[0]
+    trainRows = float(paramsList[1])
+    saveto = 'result.csv'
+    df = pd.read_csv(path, usecols=paramsList[2:])
+    allRows = df.shape[0]
+
+
+    train = df[0:int(allRows*trainRows)]
+    test = df[int(allRows*trainRows)+1:]
+
+
+    df['Timestamp'] = pd.to_datetime(df[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    df.index = df['Timestamp']
+    df = df.resample('D').mean()
+
+    train['Timestamp'] = pd.to_datetime(train[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    train.index = train['Timestamp']
+    train = train.resample('D').mean()
+
+    test['Timestamp'] = pd.to_datetime(test[paramsList[-1]], format='%Y/%m/%d %H:%M')
+    test.index = test['Timestamp']
+    test = test.resample('D').mean()
+
+    y_hat = test.copy()
+    nullArray = train.copy()
+    nullArray['time'] = train.index
+    # 以上可通用----------------------------
+
+    for i in range(2,len(paramsList)-1):
+        #https://blog.csdn.net/mooncrystal123/article/details/86736397
+        #https://blog.csdn.net/qq_41518277/article/details/85101141
+        var_data = train[paramsList[i]].diff(1).dropna()
+        #model = VAR(endog=var_data, dates=pd.date_range(train.index[0], train.index[-1]),freq='M')
+        model = VAR(endog=var_data)
+        # 估计最优滞后项系数
+        #lag_order = model.select_order()
+        # 输出结果
+        #print(lag_order.summary())
+        model_fit = model.fit(1)
+        prediction = model_fit.forecast(model_fit.y, steps=len(test[paramsList[i]]))
+        print(prediction)
+        y_hat[paramsList[i]] = prediction
+
+
+        rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
+        print(rms)
+    # --------------------------------------
+    y_hat['time'] = test.index
+    yhat_naive = np.array(y_hat)
+    nArray = np.array(nullArray)
+    newArray = np.concatenate((nArray,yhat_naive),axis=0)
+    s = pd.DataFrame(newArray, columns=paramsList[2:])
+    for i in range(2,len(paramsList)-1):
+        s[paramsList[i]][0:int(len(s)*trainRows)] = ""
+    s.to_csv(saveto,index=False,header=True,float_format='%.2f')
+
 # 6：Holt-Winters季节性预测模型
 def Holt_Winters(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'], specialParams=['7']):
 
@@ -343,63 +565,15 @@ def Holt_Winters(paramsList=['pollution.csv', '0.93','pm', 'humidity', 'date'], 
     '''
 
 
-# 7：自回归移动平均模型（ARIMA）
-def ARIMA(paramsList=['pollution.csv', '0.93','pm','date'], specialParams=['2','1','4','0','1', '1', '7']):
 
-    path = paramsList[0]
-    trainRows = float(paramsList[1])
-    saveto = 'result.csv'
-    df = pd.read_csv(path, usecols=paramsList[2:])
-    allRows = df.shape[0]
-    order = tuple(map(int, specialParams[0:3].copy()))
-    seasonal_order = tuple(map(int, specialParams[3:].copy()))
-
-    train = df[0:int(allRows*trainRows)]
-    test = df[int(allRows*trainRows)+1:]
-
-
-    df['Timestamp'] = pd.to_datetime(df[paramsList[-1]], format='%Y/%m/%d %H:%M')
-    df.index = df['Timestamp']
-    df = df.resample('D').mean()
-
-    train['Timestamp'] = pd.to_datetime(train[paramsList[-1]], format='%Y/%m/%d %H:%M')
-    train.index = train['Timestamp']
-    train = train.resample('D').mean()
-
-    test['Timestamp'] = pd.to_datetime(test[paramsList[-1]], format='%Y/%m/%d %H:%M')
-    test.index = test['Timestamp']
-    test = test.resample('D').mean()
-
-    y_hat = test.copy()
-    nullArray = train.copy()
-    nullArray['time'] = train.index
-    # 以上可通用----------------------------
-
-    for i in range(2,len(paramsList)-1):
-        fit1 = sm.tsa.statespace.SARIMAX(train[paramsList[i]], order=order, seasonal_order=seasonal_order).fit()
-        # newList.append(paramsList[i])
-        #y_hat_avg[paramsList[i]] = fit1.predict(start="2014/7/3", end="2014/12/31", dynamic=True)
-
-        y_hat[paramsList[i]] = fit1.predict(start=test.index[0], end=test.index[-1], dynamic=True)
-        y_hat[paramsList[i]] = round(y_hat[paramsList[i]],2)
-        rms = sqrt(mean_squared_error(test[paramsList[i]], y_hat[paramsList[i]]))
-        print(rms)
-    # --------------------------------------
-    y_hat['time'] = test.index
-    yhat_naive = np.array(y_hat)
-    nArray = np.array(nullArray)
-    newArray = np.concatenate((nArray,yhat_naive),axis=0)
-    s = pd.DataFrame(newArray, columns=paramsList[2:])
-    for i in range(2,len(paramsList)-1):
-        s[paramsList[i]][0:int(len(s)*trainRows)] = ""
-    s.to_csv(saveto,index=False,header=True,float_format='%.2f')
 
 
 if __name__ == '__main__':
 
+    list = ['train.csv','0.90', 'Count', 'date']
     '''
         list = [ 'pm','humidity', 'date']
-        #list = ['Count', 'Datetime']
+
         naive(path='pollution.csv', trainRows=0.93, paramsList=list, saveto='naive_new.csv')
         #naive(path='train.csv', trainRows=0.93, paramsList=list, saveto='naive_train.csv')
 
@@ -411,5 +585,5 @@ if __name__ == '__main__':
         #ARIMA(path='train.csv', allRows=18280, trainRows=0.90, paramsList=list)
         #ARIMA(path='pollution.csv', trainRows=0.90, paramsList=list)
     '''
-    naive()
+    ARmethod()
 
